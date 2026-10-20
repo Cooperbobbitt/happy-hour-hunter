@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-100/70 text-slate-900 antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Hour Hunter | San Diego & North County Coastal</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fbf8f3',
+                            100: '#f5eee3',
+                            200: '#e9dac2',
+                            500: '#c28e38',
+                            600: '#a67224',
+                            800: '#5c3d10',
+                            900: '#1e1810',
+                        },
+                        stone: {
+                            850: '#211f1d',
+                            900: '#171614',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        serif: ['Playfair Display', 'Georgia', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet JS CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+        
+        /* Custom map styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.15);
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-full flex flex-col bg-stone-100/60 text-slate-800">
+
+    <!-- TOP ANNOUNCEMENT / REAL-TIME STATUS BAR -->
+    <div class="bg-stone-900 text-stone-300 text-xs py-2 px-4 border-b border-stone-800 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto w-full flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-mono text-[11px] font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    SD CLOCK: <span id="clock-display">3:00 PM PST</span>
+                </span>
+                <span class="hidden sm:inline text-stone-400">|</span>
+                <span class="hidden sm:inline text-stone-300"><strong id="active-count-num" class="text-amber-400 font-semibold">0</strong> happy hours live right now</span>
+            </div>
+            <div class="flex items-center gap-4 text-[11px]">
+                <button onclick="openClaimModal()" class="text-amber-300 hover:text-amber-200 font-medium transition flex items-center gap-1">
+                    <i data-lucide="store" class="w-3.5 h-3.5"></i> Claim / Add a Venue
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN EDITORIAL HEADER -->
+    <header class="bg-white border-b border-stone-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between gap-4">
+                
+                <!-- Logo & Brand Title -->
+                <div class="flex items-center gap-3 cursor-pointer" onclick="resetAllFilters()">
+                    <div class="w-10 h-10 bg-stone-900 text-amber-400 rounded-lg flex items-center justify-center font-bold text-xl border border-stone-800">
+                        H
+                    </div>
+                    <div>
+                        <h1 class="font-serif text-2xl font-bold tracking-tight text-stone-950 flex items-center gap-2">
+                            Happy Hour Hunter
+                        </h1>
+                        <p class="text-xs text-stone-500 font-medium uppercase tracking-wider">San Diego & North County Coastal Guide</p>
+                    </div>
+                </div>
+
+                <!-- Main Action Buttons -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Favorites Toggle -->
+                    <button id="btn-fav-toggle" onclick="toggleFavoritesFilter()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200 transition">
+                        <i data-lucide="bookmark" class="w-4 h-4 text-stone-500"></i>
+                        <span class="hidden sm:inline">Saved</span>
+                        <span id="fav-badge" class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
+                    </button>
+
+                    <!-- Crawl Planner Drawer Button -->
+                    <button onclick="toggleCrawlDrawer()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-stone-900 hover:bg-stone-800 text-stone-100 transition border border-stone-800 shadow-xs">
+                        <i data-lucide="route" class="w-4 h-4 text-amber-400"></i>
+                        <span>Crawl Planner</span>
+                        <span id="crawl-badge" class="bg-amber-400 text-stone-950 text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTROL BAR: SEARCH, REGIONAL JUMP, & FILTER CHIPS -->
+    <section class="bg-white border-b border-stone-200 py-4 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto space-y-4">
+            
+            <!-- Row 1: Search + View Mode Buttons + Main Region Dropdown -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <!-- Search Box -->
+                <div class="md:col-span-6 relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-stone-400"></i>
+                    <input type="text" id="search-input" onkeyup="handleSearchInput()" placeholder="Search oysters, $5 IPAs, tacos, ocean views, venue name..." class="w-full pl-10 pr-9 py-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition">
+                    <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-3 top-2.5 text-stone-400 hover:text-stone-600">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Region / Neighborhood Jump Dropdown -->
+                <div class="md:col-span-3">
+                    <select id="jump-neighborhood-select" onchange="handleNeighborhoodJump(this.value)" class="w-full py-2 px-3 bg-stone-50 border border-stone-200 rounded-lg text-stone-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/50">
+                        <option value="ALL">All Cities & Neighborhoods</option>
+                        <optgroup label=" North County Coastal">
+                            <option value="Carlsbad">Carlsbad</option>
+                            <option value="Leucadia">Leucadia</option>
+                            <option value="Encinitas">Encinitas</option>
+                            <option value="Solana Beach">Solana Beach</option>
+                            <option value="Del Mar">Del Mar</option>
+                        </optgroup>
+                        <optgroup label=" Coastal & Central SD">
+                            <option value="La Jolla">La Jolla</option>
+                            <option value="Pacific Beach">Pacific Beach</option>
+                            <option value="Ocean Beach">Ocean Beach</option>
+                            <option value="Little Italy">Little Italy</option>
+                            <option value="Gaslamp">Gaslamp Quarter</option>
+                            <option value="North Park">North Park</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- View Switcher Tabs -->
+                <div class="md:col-span-3 flex items-center justify-end bg-stone-100 p-1 rounded-lg border border-stone-200">
+                    <button id="tab-city-view" onclick="switchMainView('city_group')" class="flex-1 py-1.5 text-center text-xs font-semibold rounded-md transition bg-white text-stone-900 shadow-xs border border-stone-200/60">
+                        By City
+                    </button>
+                    <button id="tab-all-cards" onclick="switchMainView('all_cards')" class="flex-1 py-1.5 text-center text-xs font-semibold rounded-md transition text-stone-600 hover:text-stone-900">
+                        All Cards
+                    </button>
+                    <button id="tab-map-view" onclick="switchMainView('map_view')" class="flex-1 py-1.5 text-center text-xs font-semibold rounded-md transition text-stone-600 hover:text-stone-900 flex items-center justify-center gap-1">
+                        <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> Map
+                    </button>
+                </div>
+            </div>
+
+            <!-- Row 2: Filter Chips & Active Toggle -->
+            <div class="flex items-center justify-between gap-3 pt-1 border-t border-stone-100 flex-wrap">
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs">
+                    <span class="text-stone-400 font-semibold uppercase tracking-wider text-[10px] mr-1">Quick Filters:</span>
+                    
+                    <button onclick="toggleChipFilter('ACTIVE_NOW')" id="chip-ACTIVE_NOW" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition flex items-center gap-1 whitespace-nowrap">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i> Active Now
+                    </button>
+
+                    <button onclick="toggleChipFilter('Ocean View')" id="chip-Ocean View" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition whitespace-nowrap">
+                        🌊 Ocean View
+                    </button>
+
+                    <button onclick="toggleChipFilter('$5 Drafts')" id="chip-$5 Drafts" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition whitespace-nowrap">
+                        🍺 $5 Drafts
+                    </button>
+
+                    <button onclick="toggleChipFilter('Food Deals')" id="chip-Food Deals" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition whitespace-nowrap">
+                        🌮 Food Specials
+                    </button>
+
+                    <button onclick="toggleChipFilter('Oysters')" id="chip-Oysters" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition whitespace-nowrap">
+                        🦪 Oysters
+                    </button>
+
+                    <button onclick="toggleChipFilter('Dog Friendly')" id="chip-Dog Friendly" class="chip-btn border border-stone-200 bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md font-medium hover:border-amber-500 transition whitespace-nowrap">
+                        🐾 Dog Friendly
+                    </button>
+                </div>
+
+                <div id="reset-filter-wrap" class="hidden">
+                    <button onclick="resetAllFilters()" class="text-xs text-amber-700 font-semibold hover:underline flex items-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Clear Filters
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- MAIN CONTENT VIEW -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- VIEW 1: BY CITY / REGION (ACCORDION & SECTIONS) -->
+        <div id="view-by-city" class="space-y-12">
+            <!-- Injected via JavaScript -->
+        </div>
+
+        <!-- VIEW 2: ALL CARDS GRID -->
+        <div id="view-all-cards" class="hidden">
+            <div id="grid-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- VIEW 3: INTERACTIVE LEAFLET MAP VIEW -->
+        <div id="view-map" class="hidden">
+            <div class="bg-white p-2 rounded-xl border border-stone-200 shadow-xs">
+                <div id="map" class="w-full h-[650px] rounded-lg"></div>
+            </div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div id="empty-state" class="hidden bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-md mx-auto my-8">
+            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="search-x" class="w-6 h-6"></i>
+            </div>
+            <h3 class="font-serif font-bold text-lg text-stone-900 mb-1">No Happy Hours Found</h3>
+            <p class="text-stone-500 text-xs mb-4">Try clearing your filters or searching for another neighborhood or item.</p>
+            <button onclick="resetAllFilters()" class="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition">
+                Reset All Filters
+            </button>
+        </div>
+
+    </main>
+
+    <!-- CRAWL PLANNER DRAWER / SLIDE-OVER -->
+    <div id="crawl-drawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white border-l border-stone-200 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+        <div class="p-4 bg-stone-900 text-white flex items-center justify-between border-b border-stone-800">
+            <div class="flex items-center gap-2">
+                <i data-lucide="route" class="w-5 h-5 text-amber-400"></i>
+                <h3 class="font-serif font-bold text-lg">Crawl Planner</h3>
+            </div>
+            <button onclick="toggleCrawlDrawer()" class="text-stone-400 hover:text-white p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="p-4 bg-stone-50 border-b border-stone-200 grid grid-cols-2 gap-3 text-center">
+            <div class="bg-white p-3 rounded-lg border border-stone-200">
+                <span class="text-[10px] font-bold text-stone-400 uppercase block">Stops Added</span>
+                <span id="crawl-stop-count" class="text-xl font-extrabold text-stone-900">0</span>
+            </div>
+            <div class="bg-white p-3 rounded-lg border border-stone-200">
+                <span class="text-[10px] font-bold text-stone-400 uppercase block">Est. Savings / Person</span>
+                <span id="crawl-savings-est" class="text-xl font-extrabold text-emerald-600">$0.00</span>
+            </div>
+        </div>
+
+        <div id="crawl-items-container" class="flex-grow p-4 overflow-y-auto space-y-3">
+            <!-- Dynamic list items -->
+        </div>
+
+        <div class="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between gap-3">
+            <button onclick="clearCrawl()" class="text-xs font-semibold text-red-600 hover:underline">
+                Clear Stops
+            </button>
+            <button onclick="copyCrawlItinerary()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold text-xs rounded-lg transition shadow-xs flex items-center gap-1.5">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy Itinerary
+            </button>
+        </div>
+    </div>
+
+    <!-- CLAIM VENUE MODAL -->
+    <div id="claim-modal" class="fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-stone-200 shadow-2xl p-6 text-stone-900 relative">
+            <button onclick="closeClaimModal()" class="absolute top-4 right-4 text-stone-400 hover:text-stone-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                    <i data-lucide="store" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-serif font-bold text-lg">Partner / Claim Your Venue</h3>
+                    <p class="text-xs text-stone-500">Update your specials or upgrade for top regional placement.</p>
+                </div>
+            </div>
+
+            <form onsubmit="handleClaimForm(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Restaurant / Bar Name *</label>
+                    <input type="text" required placeholder="e.g. Fish 101 Leucadia" class="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-700 mb-1">Contact Name *</label>
+                        <input type="text" required placeholder="Alex Smith" class="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-700 mb-1">Email *</label>
+                        <input type="email" required placeholder="alex@bar.com" class="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Partnership Interest</label>
+                    <select class="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                        <option>Verify & Free Menu Updates</option>
+                        <option>Featured Top Placement ($99/mo)</option>
+                        <option>Push Notification Flash Deal Host ($149/mo)</option>
+                    </select>
+                </div>
+                <div class="pt-3 flex justify-end gap-2">
+                    <button type="button" onclick="closeClaimModal()" class="px-4 py-2 border border-stone-300 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-stone-900 text-stone-400 py-10 border-t border-stone-800 text-xs mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-serif text-lg font-bold text-stone-100">Happy Hour Hunter</span>
+                    <span class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-mono">SD Edition</span>
+                </div>
+                <p class="text-stone-400 max-w-md">Curated daily guide to food & drink specials from Oceanside & Carlsbad down to Gaslamp & Ocean Beach.</p>
+            </div>
+            <div class="flex items-center gap-6">
+                <button onclick="openClaimModal()" class="text-amber-400 hover:underline font-medium">Bar Owners</button>
+                <a href="#" onclick="alert('Prices & schedules change. Always confirm directly with the venue!'); return false;" class="hover:text-stone-200">Disclaimer</a>
+                <button onclick="resetAllFilters()" class="hover:text-stone-200">Reset App</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        // --- COMPREHENSIVE DATASET GROUPED BY CITIES & REGIONS ---
+        const happyHourData = [
+            // ==================== NORTH COUNTY COASTAL ====================
+            // CARLSBAD
+            {
+                id: 'carlsbad-1',
+                name: 'The Camp Store',
+                city: 'Carlsbad',
+                region: 'North County Coastal',
+                address: '7201 Carlsbad Blvd, Carlsbad, CA 92008',
+                priceLevel: '$$',
+                rating: 4.8,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$5 Local Draft Craft Beers', '$6 House Wine'],
+                foodDeals: ['$8 Artisan Pizza Slices', '$6 Pretzels & Beer Cheese'],
+                features: ['Ocean View', 'Live Music', 'Patio', '$5 Drafts', 'Dog Friendly'],
+                lat: 33.0932,
+                lng: -117.3110,
+                savingsEst: 4.50,
+                image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80',
+                notes: 'Open-air bluffs overlooking South Carlsbad State Beach with live acoustic music at sunset.'
+            },
+            {
+                id: 'carlsbad-2',
+                name: 'Windmill Food Hall',
+                city: 'Carlsbad',
+                region: 'North County Coastal',
+                address: '890 Palomar Airport Rd, Carlsbad, CA 92011',
+                priceLevel: '$$',
+                rating: 4.6,
+                daysText: 'Mon - Thu',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$5 San Diego Draft Pints', '$7 Signature Margaritas'],
+                foodDeals: ['$3 Taco Specials', '$6 Garlic Fries', '$8 Sliders'],
+                features: ['$5 Drafts', 'Food Deals', 'Patio'],
+                lat: 33.1270,
+                lng: -117.3240,
+                savingsEst: 4.00,
+                image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80',
+                notes: 'Huge social food hall with 14 vendors and central craft bar with indoor games.'
+            },
+            {
+                id: 'carlsbad-3',
+                name: 'Paon Restaurant & Wine Bar',
+                city: 'Carlsbad',
+                region: 'North County Coastal',
+                address: '2975 Roosevelt St, Carlsbad, CA 92008',
+                priceLevel: '$$$',
+                rating: 4.7,
+                daysText: 'Tue - Sun',
+                daysList: ['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                startHour: 16,
+                endHour: 18,
+                timeText: '4:00 PM - 6:00 PM',
+                drinkDeals: ['$8 Sommelier Selected Wines', '$7 Craft Cocktails'],
+                foodDeals: ['$10 French Charcuterie Board', '$8 Escargot & Crostini'],
+                features: ['Patio', 'Fine Dining'],
+                lat: 33.1601,
+                lng: -117.3502,
+                savingsEst: 6.00,
+                image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80',
+                notes: 'Upscale French bistro patio in Carlsbad Village offering high-end wine discounts.'
+            },
+
+            // LEUCADIA
+            {
+                id: 'leucadia-1',
+                name: 'Fish 101 Leucadia',
+                city: 'Leucadia',
+                region: 'North County Coastal',
+                address: '1468 N Coast Hwy 101, Encinitas, CA 92024',
+                priceLevel: '$$',
+                rating: 4.7,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$4 Local Draft Beers', '$6 House Wines'],
+                foodDeals: ['$1.75 Fresh Oysters', '$4 Grilled Fish Tacos', '$6 Clam Chowder'],
+                features: ['Oysters', 'Food Deals', '$5 Drafts', 'Casual'],
+                lat: 33.0691,
+                lng: -117.3051,
+                savingsEst: 5.00,
+                image: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?auto=format&fit=crop&w=600&q=80',
+                notes: 'Quintessential Highway 101 surf-shack seafood eatery known for daily fresh catches.'
+            },
+            {
+                id: 'leucadia-2',
+                name: 'Le Papagayo Leucadia',
+                city: 'Leucadia',
+                region: 'North County Coastal',
+                address: '1002 N Coast Hwy 101, Encinitas, CA 92024',
+                priceLevel: '$$',
+                rating: 4.7,
+                daysText: 'Daily',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                startHour: 16,
+                endHour: 18,
+                timeText: '4:00 PM - 6:00 PM',
+                drinkDeals: ['$5 Craft Beers', '$6 Sangria Glass', '$7 House Cocktails'],
+                foodDeals: ['$5 Tapas Dishes', '$6 Empanadas', '$7 Calamari'],
+                features: ['Live Music', 'Patio', '$5 Drafts', 'Dog Friendly'],
+                lat: 33.0642,
+                lng: -117.3025,
+                image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80',
+                notes: 'Vibrant Latin-Mediterranean fusion joint with nightly live acoustic sets on the covered patio.'
+            },
+
+            // ENCINITAS
+            {
+                id: 'encinitas-1',
+                name: 'Pacific Coast Grill',
+                city: 'Encinitas',
+                region: 'North County Coastal',
+                address: '2526 S Coast Hwy 101, Cardiff / Encinitas, CA 92007',
+                priceLevel: '$$$',
+                rating: 4.8,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$6 San Diego Craft Drafts', '$7 Margaritas'],
+                foodDeals: ['$5 Pacifico Fish Tacos', '$8 Ahi Poke Tacos', '$6 Lobster Sliders'],
+                features: ['Ocean View', 'Patio', 'Oysters', '$5 Drafts'],
+                lat: 33.0135,
+                lng: -117.2801,
+                savingsEst: 6.50,
+                image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+                notes: 'Right on the sand at Cardiff Reef with bi-level outdoor decks and panoramic wave views.'
+            },
+            {
+                id: 'encinitas-2',
+                name: 'The Waverly',
+                city: 'Encinitas',
+                region: 'North County Coastal',
+                address: '2005 San Elijo Ave, Cardiff, CA 92007',
+                priceLevel: '$$$',
+                rating: 4.6,
+                daysText: 'Mon - Thu',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$8 Specialty Spritzers', '$6 Local Craft Beers'],
+                foodDeals: ['$7 Truffle Fries', '$9 Wagyu Beef Sliders'],
+                features: ['Patio', 'Cocktails'],
+                lat: 33.0185,
+                lng: -117.2808,
+                savingsEst: 5.00,
+                image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=600&q=80',
+                notes: 'Stylish Cardiff lounge with chic modern coastal aesthetic and curated craft cocktails.'
+            },
+            {
+                id: 'encinitas-3',
+                name: 'Union Kitchen & Tap',
+                city: 'Encinitas',
+                region: 'North County Coastal',
+                address: '1108 S Coast Hwy 101, Encinitas, CA 92024',
+                priceLevel: '$$',
+                rating: 4.5,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$5 Local IPA Drafts', '$6 Craft Well Drinks'],
+                foodDeals: ['$3 Street Tacos', '$7 Flatbreads', '$6 Pretzels'],
+                features: ['$5 Drafts', 'Food Deals', 'Patio', 'Dog Friendly'],
+                lat: 33.0440,
+                lng: -117.2920,
+                image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
+                notes: 'High-energy industrial open-air tavern along Coast Hwy 101.'
+            },
+
+            // SOLANA BEACH
+            {
+                id: 'solana-1',
+                name: 'Pillbox Tavern',
+                city: 'Solana Beach',
+                region: 'North County Coastal',
+                address: '117 Solana Hills Dr, Solana Beach, CA 92075',
+                priceLevel: '$$',
+                rating: 4.6,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$5 Craft Pints', '$6 House Well Cocktails'],
+                foodDeals: ['$0.75 Wing Wednesdays', '$5 Loaded Nachos'],
+                features: ['$5 Drafts', 'Food Deals', 'Casual'],
+                lat: 32.9982,
+                lng: -117.2680,
+                savingsEst: 4.00,
+                image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                notes: 'Retro coastal tavern famous for crispy wings and neighborhood vibe.'
+            },
+            {
+                id: 'solana-2',
+                name: 'Culture Brewing Co',
+                city: 'Solana Beach',
+                region: 'North County Coastal',
+                address: '111 S Cedros Ave, Solana Beach, CA 92075',
+                priceLevel: '$',
+                rating: 4.8,
+                daysText: 'Mon - Thu',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu'],
+                startHour: 16,
+                endHour: 18,
+                timeText: '4:00 PM - 6:00 PM',
+                drinkDeals: ['$5 House Brewed IPA Pints'],
+                foodDeals: ['BYO Food / Local Vendor Popups'],
+                features: ['$5 Drafts', 'Dog Friendly', 'Cedros District'],
+                lat: 32.9918,
+                lng: -117.2710,
+                savingsEst: 3.50,
+                image: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?auto=format&fit=crop&w=600&q=80',
+                notes: 'Microbrewery tasting room in Cedros Design District with rotating local craft taps.'
+            },
+
+            // DEL MAR
+            {
+                id: 'delmar-1',
+                name: 'Monarch Ocean Pub',
+                city: 'Del Mar',
+                region: 'North County Coastal',
+                address: '1555 Camino Del Mar, Del Mar, CA 92014',
+                priceLevel: '$$$',
+                rating: 4.7,
+                daysText: 'Mon - Thu',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$6 San Diego Craft Drafts', '$8 Ocean Spritz'],
+                foodDeals: ['$7 Ahi Poke Nachos', '$6 Smash Sliders'],
+                features: ['Ocean View', 'Patio', 'Dog Friendly'],
+                lat: 32.9598,
+                lng: -117.2655,
+                savingsEst: 5.50,
+                image: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=600&q=80',
+                notes: 'Rooftop Del Mar plaza pub with games, ocean sunset views, and local drafts.'
+            },
+            {
+                id: 'delmar-2',
+                name: 'Pacifica Del Mar',
+                city: 'Del Mar',
+                region: 'North County Coastal',
+                address: '1555 Camino Del Mar #325, Del Mar, CA 92014',
+                priceLevel: '$$$',
+                rating: 4.7,
+                daysText: 'Daily',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                startHour: 16,
+                endHour: 18,
+                timeText: '4:00 PM - 6:00 PM',
+                drinkDeals: ['$6 Draft Beers', '$8 Signature Vodka Cocktails'],
+                foodDeals: ['$2.50 Fresh Oysters', '$7 Fish Tacos', '$8 Calamari'],
+                features: ['Ocean View', 'Oysters', 'Fine Dining'],
+                lat: 32.9599,
+                lng: -117.2650,
+                savingsEst: 6.00,
+                image: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?auto=format&fit=crop&w=600&q=80',
+                notes: 'Award-winning seafood dining deck overlooking the Pacific Ocean.'
+            },
+
+            // ==================== CENTRAL & COASTAL SD ====================
+            // LITTLE ITALY
+            {
+                id: 'littleitaly-1',
+                name: 'Ironside Fish & Oyster',
+                city: 'Little Italy',
+                region: 'Central & Coastal San Diego',
+                address: '1654 India St, San Diego, CA 92101',
+                priceLevel: '$$$',
+                rating: 4.7,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$7 Draft Craft Beers', '$8 Draft Cocktails'],
+                foodDeals: ['$1.50 Select Oyster Daily Specials', '$6 Chowder Fries'],
+                features: ['Oysters', 'Food Deals', 'Patio'],
+                lat: 32.7230,
+                lng: -117.1685,
+                savingsEst: 6.00,
+                image: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?auto=format&fit=crop&w=600&q=80',
+                notes: 'Bustling renovated warehouse with raw bar, custom drink fixtures, and fresh daily oysters.'
+            },
+            {
+                id: 'littleitaly-2',
+                name: 'Waterfront Bar & Grill',
+                city: 'Little Italy',
+                region: 'Central & Coastal San Diego',
+                address: '2044 Kettner Blvd, San Diego, CA 92101',
+                priceLevel: '$',
+                rating: 4.6,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$4 Well Drinks', '$4 Domestic Drafts'],
+                foodDeals: ['$5 Slider Baskets', '$4 Loaded Fries'],
+                features: ['Historic', 'Food Deals', 'Casual'],
+                lat: 32.7265,
+                lng: -117.1698,
+                savingsEst: 4.00,
+                image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=600&q=80',
+                notes: 'San Diego\'s oldest oldest tavern (Est. 1933) serving cold beers and classic tavern sliders.'
+            },
+
+            // GASLAMP
+            {
+                id: 'gaslamp-1',
+                name: 'Altitude Sky Lounge',
+                city: 'Gaslamp',
+                region: 'Central & Coastal San Diego',
+                address: '660 K St, San Diego, CA 92101',
+                priceLevel: '$$$',
+                rating: 4.6,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 17,
+                endHour: 19,
+                timeText: '5:00 PM - 7:00 PM',
+                drinkDeals: ['$6 Well Drinks', '$5 Draft Beers'],
+                foodDeals: ['$7 Flatbread Pizzas', '$6 Wings'],
+                features: ['Rooftop View', '$5 Drafts', 'Petco Park View'],
+                lat: 32.7102,
+                lng: -117.1590,
+                savingsEst: 5.00,
+                image: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=600&q=80',
+                notes: '22 stories up overlooking Petco Park stadium and downtown San Diego skyline.'
+            },
+
+            // PACIFIC BEACH
+            {
+                id: 'pb-1',
+                name: 'PB Shore Club',
+                city: 'Pacific Beach',
+                region: 'Central & Coastal San Diego',
+                address: '4343 Ocean Blvd, San Diego, CA 92109',
+                priceLevel: '$$',
+                rating: 4.4,
+                daysText: 'Mon - Thu',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$4 Mexican Draft Lagers', '$5 Frozen Red Bull Slushies'],
+                foodDeals: ['$3 Fish Tacos', '$5 Quesadillas'],
+                features: ['Ocean View', 'Patio', 'Food Deals', 'Casual'],
+                lat: 32.7981,
+                lng: -117.2568,
+                savingsEst: 4.00,
+                image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+                notes: 'Directly on Pacific Beach boardwalk with grand ocean view windows.'
+            },
+
+            // OCEAN BEACH
+            {
+                id: 'ob-1',
+                name: 'Wonderland Ocean Pub',
+                city: 'Ocean Beach',
+                region: 'Central & Coastal San Diego',
+                address: '5083 Santa Monica Ave, San Diego, CA 92107',
+                priceLevel: '$$',
+                rating: 4.7,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 15,
+                endHour: 18,
+                timeText: '3:00 PM - 6:00 PM',
+                drinkDeals: ['$5 San Diego Local Drafts', '$6 Sunset Margaritas'],
+                foodDeals: ['$6 Fish Tacos', '$7 Ahi Poke Chips'],
+                features: ['Ocean View', '$5 Drafts', 'Sunset Toast'],
+                lat: 32.7460,
+                lng: -117.2510,
+                savingsEst: 4.50,
+                image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+                notes: 'Panoramas of Ocean Beach Pier; features a complimentary sunset shot toast for guests daily.'
+            },
+
+            // LA JOLLA
+            {
+                id: 'lajolla-1',
+                name: 'Duke\'s La Jolla',
+                city: 'La Jolla',
+                region: 'Central & Coastal San Diego',
+                address: '1216 Prospect St, La Jolla, CA 92037',
+                priceLevel: '$$$',
+                rating: 4.7,
+                daysText: 'Daily',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                startHour: 15,
+                endHour: 17,
+                timeText: '3:00 PM - 5:00 PM',
+                drinkDeals: ['$6 Signature Mai Tais', '$5 Local Craft Drafts'],
+                foodDeals: ['$7 Kalua Pork Tacos', '$8 Coconut Shrimp'],
+                features: ['Ocean View', 'Patio', '$5 Drafts'],
+                lat: 32.8480,
+                lng: -117.2728,
+                savingsEst: 6.00,
+                image: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=600&q=80',
+                notes: 'Multi-level oceanfront terrace directly overlooking La Jolla Cove.'
+            },
+
+            // NORTH PARK
+            {
+                id: 'northpark-1',
+                name: 'Underbelly North Park',
+                city: 'North Park',
+                region: 'Central & Coastal San Diego',
+                address: '3000 Upas St, San Diego, CA 92104',
+                priceLevel: '$$',
+                rating: 4.6,
+                daysText: 'Mon - Fri',
+                daysList: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+                startHour: 16,
+                endHour: 18,
+                timeText: '4:00 PM - 6:00 PM',
+                drinkDeals: ['$5 Japanese Draft Lagers', '$6 Draft Sake'],
+                foodDeals: ['$4 Pork Belly Steam Buns', '$6 Gyoza Plates'],
+                features: ['$5 Drafts', 'Patio', 'Firepits'],
+                lat: 32.7485,
+                lng: -117.1292,
+                savingsEst: 4.00,
+                image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
+                notes: 'Open-air Japanese ramen bar with outdoor firepit bar seating.'
+            }
+        ];
+
+        // --- GLOBAL APP STATE ---
+        let currentView = 'city_group'; // 'city_group', 'all_cards', 'map_view'
+        let activeFilterChip = null; // 'ACTIVE_NOW', 'Ocean View', etc.
+        let searchQuery = '';
+        let selectedNeighborhoodFilter = 'ALL';
+        let showFavoritesOnly = false;
+
+        let favorites = JSON.parse(localStorage.getItem('hhh_favs_v2') || '[]');
+        let crawlStops = JSON.parse(localStorage.getItem('hhh_crawl_v2') || '[]');
+        let mapInstance = null;
+        let mapMarkers = [];
+
+        // --- INIT ON LOAD ---
+        window.onload = function() {
+            lucide.createIcons();
+            updateSanDiegoClock();
+            setInterval(updateSanDiegoClock, 30000);
+
+            renderApp();
+            updateBadges();
+        };
+
+        // Real-time PST clock & active indicator
+        function updateSanDiegoClock() {
+            const now = new Date();
+            const timeOptions = { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true };
+            const dayOptions = { timeZone: 'America/Los_Angeles', weekday: 'short' };
+            
+            const timeStr = now.toLocaleTimeString('en-US', timeOptions);
+            const dayStr = now.toLocaleDateString('en-US', dayOptions);
+
+            const clockEl = document.getElementById('clock-display');
+            if (clockEl) clockEl.innerText = `${dayStr} ${timeStr} PST`;
+
+            // Active calculation
+            const currentHour = now.getHours();
+            const todayCode = dayStr.substring(0, 3);
+
+            let activeCount = 0;
+            happyHourData.forEach(item => {
+                if (isItemActive(item, todayCode, currentHour)) activeCount++;
+            });
+
+            const activeNumEl = document.getElementById('active-count-num');
+            if (activeNumEl) activeNumEl.innerText = activeCount;
+        }
+
+        function isItemActive(item, currentDayCode, currentHour) {
+            const dayMatch = item.daysList.includes('Daily') || item.daysList.includes(currentDayCode);
+            const timeMatch = currentHour >= item.startHour && currentHour < item.endHour;
+            return dayMatch && timeMatch;
+        }
+
+        // --- FILTERING & RENDERING PIPELINE ---
+        function getFilteredData() {
+            const now = new Date();
+            const dayOptions = { timeZone: 'America/Los_Angeles', weekday: 'short' };
+            const todayCode = now.toLocaleDateString('en-US', dayOptions).substring(0, 3);
+            const currentHour = now.getHours();
+
+            return happyHourData.filter(item => {
+                // Search query
+                if (searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    const nameMatch = item.name.toLowerCase().includes(q);
+                    const cityMatch = item.city.toLowerCase().includes(q);
+                    const drinkMatch = item.drinkDeals.some(d => d.toLowerCase().includes(q));
+                    const foodMatch = item.foodDeals.some(f => f.toLowerCase().includes(q));
+                    if (!nameMatch && !cityMatch && !drinkMatch && !foodMatch) return false;
+                }
+
+                // Neighborhood filter
+                if (selectedNeighborhoodFilter !== 'ALL') {
+                    if (item.city.toLowerCase() !== selectedNeighborhoodFilter.toLowerCase()) return false;
+                }
+
+                // Favorites filter
+                if (showFavoritesOnly && !favorites.includes(item.id)) return false;
+
+                // Quick Chip filter
+                if (activeFilterChip === 'ACTIVE_NOW') {
+                    if (!isItemActive(item, todayCode, currentHour)) return false;
+                } else if (activeFilterChip === 'Food Deals') {
+                    if (item.foodDeals.length === 0) return false;
+                } else if (activeFilterChip === 'Oysters') {
+                    const hasOysters = item.foodDeals.some(f => f.toLowerCase().includes('oyster')) || item.features.includes('Oysters');
+                    if (!hasOysters) return false;
+                } else if (activeFilterChip) {
+                    if (!item.features.includes(activeFilterChip)) return false;
+                }
+
+                return true;
+            });
+        }
+
+        function renderApp() {
+            const filtered = getFilteredData();
+            const emptyState = document.getElementById('empty-state');
+
+            const viewByCityContainer = document.getElementById('view-by-city');
+            const viewAllCardsContainer = document.getElementById('view-all-cards');
+            const viewMapContainer = document.getElementById('view-map');
+
+            if (filtered.length === 0) {
+                viewByCityContainer.classList.add('hidden');
+                viewAllCardsContainer.classList.add('hidden');
+                viewMapContainer.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            if (currentView === 'city_group') {
+                viewByCityContainer.classList.remove('hidden');
+                viewAllCardsContainer.classList.add('hidden');
+                viewMapContainer.classList.add('hidden');
+                renderCityGroupView(filtered);
+            } else if (currentView === 'all_cards') {
+                viewByCityContainer.classList.add('hidden');
+                viewAllCardsContainer.classList.remove('hidden');
+                viewMapContainer.classList.add('hidden');
+                renderAllCardsView(filtered);
+            } else if (currentView === 'map_view') {
+                viewByCityContainer.classList.add('hidden');
+                viewAllCardsContainer.classList.add('hidden');
+                viewMapContainer.classList.remove('hidden');
+                renderMapView(filtered);
+            }
+
+            lucide.createIcons();
+        }
+
+        // --- RENDER REGIONAL & CITY NEIGHBORHOOD GROUPED VIEW ---
+        function renderCityGroupView(items) {
+            const container = document.getElementById('view-by-city');
+            
+            // Group by Region first, then City
+            const regions = ['North County Coastal', 'Central & Coastal San Diego'];
+            let html = '';
+
+            regions.forEach(regionName => {
+                const regionItems = items.filter(i => i.region === regionName);
+                if (regionItems.length === 0) return;
+
+                // Unique Cities in this Region
+                const citiesInRegion = [...new Set(regionItems.map(i => i.city))];
+
+                html += `
+                    <section class="space-y-6">
+                        <!-- Region Section Title -->
+                        <div class="border-b-2 border-stone-900 pb-2 flex items-center justify-between">
+                            <h2 class="font-serif font-bold text-2xl text-stone-950 flex items-center gap-2">
+                                <span>${regionName === 'North County Coastal' ? '🌊' : '🏙️'}</span>
+                                ${regionName}
+                            </h2>
+                            <span class="text-xs font-semibold text-stone-500 bg-stone-200 px-2.5 py-1 rounded-full">
+                                ${regionItems.length} spots
+                            </span>
+                        </div>
+
+                        <!-- Cities list under this region -->
+                        <div class="space-y-8 pl-1 sm:pl-3">
+                            ${citiesInRegion.map(cityName => {
+                                const cityItems = regionItems.filter(i => i.city === cityName);
+                                return `
+                                    <div id="city-sec-${cityName.toLowerCase().replace(/\s+/g, '-')}" class="space-y-4">
+                                        <!-- City Heading -->
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                                            <h3 class="font-bold text-lg text-stone-900 uppercase tracking-wide">
+                                                ${cityName}
+                                            </h3>
+                                            <span class="text-xs text-stone-400 font-medium">(${cityItems.length})</span>
+                                            <div class="flex-grow h-px bg-stone-200"></div>
+                                        </div>
+
+                                        <!-- Bars & Restaurants directly under this City -->
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            ${cityItems.map(spot => createCompactCardHtml(spot)).join('')}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </section>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // --- RENDER ALL CARDS GRID VIEW ---
+        function renderAllCardsView(items) {
+            const container = document.getElementById('grid-cards-container');
+            container.innerHTML = items.map(spot => createCompactCardHtml(spot)).join('');
+        }
+
+        // --- CARD HTML GENERATOR (HUMAN-CRAFTED CLEAN DESIGN) ---
+        function createCompactCardHtml(spot) {
+            const now = new Date();
+            const dayOptions = { timeZone: 'America/Los_Angeles', weekday: 'short' };
+            const todayCode = now.toLocaleDateString('en-US', dayOptions).substring(0, 3);
+            const currentHour = now.getHours();
+
+            const active = isItemActive(spot, todayCode, currentHour);
+            const isFav = favorites.includes(spot.id);
+            const inCrawl = crawlStops.includes(spot.id);
+
+            return `
+                <div class="bg-white rounded-xl border border-stone-200/90 shadow-xs hover:border-stone-400 transition-all duration-200 flex flex-col overflow-hidden group">
+                    <!-- Card Top Image Header -->
+                    <div class="relative h-44 w-full bg-stone-900 overflow-hidden">
+                        <img src="${spot.image}" alt="${spot.name}" class="w-full h-full object-cover group-hover:scale-102 transition duration-500 opacity-90">
+                        <div class="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-transparent to-black/20"></div>
+
+                        <!-- Top Badges -->
+                        <div class="absolute top-3 left-3">
+                            <span class="bg-stone-900/90 text-stone-200 text-[10px] font-bold px-2.5 py-1 rounded border border-stone-700 uppercase tracking-wider">
+                                ${spot.city}
+                            </span>
+                        </div>
+
+                        <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                            <button onclick="toggleFavorite('${spot.id}')" class="p-1.5 rounded-md bg-stone-900/80 hover:bg-stone-900 text-white transition border border-stone-700" title="Bookmark">
+                                <i data-lucide="bookmark" class="w-3.5 h-3.5 ${isFav ? 'text-amber-400 fill-amber-400' : 'text-stone-300'}"></i>
+                            </button>
+                            <button onclick="toggleCrawl('${spot.id}')" class="p-1.5 rounded-md ${inCrawl ? 'bg-amber-500 text-stone-950' : 'bg-stone-900/80 text-stone-200'} hover:bg-amber-500 hover:text-stone-950 transition border border-stone-700" title="Add to Crawl">
+                                <i data-lucide="route" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+
+                        <!-- Bottom Active Badge -->
+                        <div class="absolute bottom-3 left-3">
+                            ${active ? 
+                                `<span class="bg-emerald-600 text-white text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-xs">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> ACTIVE NOW
+                                 </span>` : 
+                                `<span class="bg-stone-800/80 text-stone-300 text-[11px] font-medium px-2 py-0.5 rounded border border-stone-700">
+                                    ${spot.daysText} • ${spot.timeText}
+                                 </span>`
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Card Main Body -->
+                    <div class="p-4 flex-grow flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex items-start justify-between gap-2 mb-1">
+                                <h4 class="font-bold text-stone-900 text-base group-hover:text-amber-700 transition">
+                                    ${spot.name}
+                                </h4>
+                                <span class="text-xs font-semibold text-stone-400 shrink-0">${spot.priceLevel}</span>
+                            </div>
+
+                            <p class="text-xs text-stone-500 mb-3 flex items-center gap-1">
+                                <i data-lucide="map-pin" class="w-3 h-3 text-stone-400"></i>
+                                <span class="truncate">${spot.address}</span>
+                            </p>
+
+                            <!-- Drinks Section -->
+                            <div class="space-y-1 mb-2">
+                                <span class="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Drink Specials</span>
+                                ${spot.drinkDeals.map(d => `
+                                    <div class="text-xs text-stone-800 font-medium flex items-center gap-1.5">
+                                        <i data-lucide="beer" class="w-3 h-3 text-amber-600 shrink-0"></i>
+                                        <span class="truncate">${d}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <!-- Food Section -->
+                            ${spot.foodDeals.length > 0 ? `
+                                <div class="space-y-1">
+                                    <span class="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Food Deals</span>
+                                    ${spot.foodDeals.map(f => `
+                                        <div class="text-xs text-stone-800 font-medium flex items-center gap-1.5">
+                                            <i data-lucide="utensils" class="w-3 h-3 text-emerald-600 shrink-0"></i>
+                                            <span class="truncate">${f}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Card Footer Features -->
+                        <div class="pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
+                            <div class="flex items-center gap-1 overflow-hidden">
+                                ${spot.features.slice(0, 2).map(feat => `
+                                    <span class="bg-stone-100 text-stone-600 text-[10px] font-medium px-2 py-0.5 rounded">${feat}</span>
+                                `).join('')}
+                            </div>
+                            <a href="https://maps.google.com/?q=${encodeURIComponent(spot.name + ' ' + spot.address)}" target="_blank" class="text-amber-700 font-semibold hover:underline flex items-center gap-0.5">
+                                Map <i data-lucide="external-link" class="w-3 h-3"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- MAP VIEW RENDER ---
+        function renderMapView(items) {
+            if (!mapInstance) {
+                mapInstance = L.map('map').setView([32.9500, -117.2200], 11);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(mapInstance);
+            }
+
+            setTimeout(() => { mapInstance.invalidateSize(); }, 200);
+
+            // Clear old markers
+            mapMarkers.forEach(m => mapInstance.removeLayer(m));
+            mapMarkers = [];
+
+            items.forEach(spot => {
+                const marker = L.marker([spot.lat, spot.lng]).addTo(mapInstance);
+                marker.bindPopup(`
+                    <div class="p-1 max-w-xs">
+                        <strong class="text-stone-900 text-sm block">${spot.name}</strong>
+                        <span class="text-xs text-amber-700 font-semibold block mb-1">${spot.city}</span>
+                        <p class="text-xs text-stone-600 mb-2">${spot.daysText}: ${spot.timeText}</p>
+                        <a href="https://maps.google.com/?q=${encodeURIComponent(spot.name + ' ' + spot.address)}" target="_blank" class="text-xs text-blue-600 underline">Get Directions</a>
+                    </div>
+                `);
+                mapMarkers.push(marker);
+            });
+        }
+
+        // --- USER CONTROLS & INTERACTION ---
+        function switchMainView(viewMode) {
+            currentView = viewMode;
+
+            const tabCity = document.getElementById('tab-city-view');
+            const tabAll = document.getElementById('tab-all-cards');
+            const tabMap = document.getElementById('tab-map-view');
+
+            const activeClass = "flex-1 py-1.5 text-center text-xs font-semibold rounded-md transition bg-white text-stone-900 shadow-xs border border-stone-200/60";
+            const inactiveClass = "flex-1 py-1.5 text-center text-xs font-semibold rounded-md transition text-stone-600 hover:text-stone-900";
+
+            tabCity.className = viewMode === 'city_group' ? activeClass : inactiveClass;
+            tabAll.className = viewMode === 'all_cards' ? activeClass : inactiveClass;
+            tabMap.className = viewMode === 'map_view' ? activeClass : inactiveClass;
+
+            renderApp();
+        }
+
+        function handleSearchInput() {
+            searchQuery = document.getElementById('search-input').value.trim();
+            document.getElementById('clear-search-btn').classList.toggle('hidden', searchQuery === '');
+            updateResetWrap();
+            renderApp();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            searchQuery = '';
+            document.getElementById('clear-search-btn').classList.add('hidden');
+            updateResetWrap();
+            renderApp();
+        }
+
+        function handleNeighborhoodJump(cityVal) {
+            selectedNeighborhoodFilter = cityVal;
+            updateResetWrap();
+            renderApp();
+
+            if (cityVal !== 'ALL' && currentView === 'city_group') {
+                const secId = `city-sec-${cityVal.toLowerCase().replace(/\s+/g, '-')}`;
+                const el = document.getElementById(secId);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function toggleChipFilter(chipName) {
+            if (activeFilterChip === chipName) {
+                activeFilterChip = null;
+            } else {
+                activeFilterChip = chipName;
+            }
+
+            document.querySelectorAll('.chip-btn').forEach(btn => {
+                const btnId = btn.id.replace('chip-', '');
+                if (btnId === activeFilterChip) {
+                    btn.classList.add('bg-stone-900', 'text-white', 'border-stone-900');
+                    btn.classList.remove('bg-stone-50', 'text-stone-700', 'border-stone-200');
+                } else {
+                    btn.classList.remove('bg-stone-900', 'text-white', 'border-stone-900');
+                    btn.classList.add('bg-stone-50', 'text-stone-700', 'border-stone-200');
+                }
+            });
+
+            updateResetWrap();
+            renderApp();
+        }
+
+        function toggleFavoritesFilter() {
+            showFavoritesOnly = !showFavoritesOnly;
+            const btn = document.getElementById('btn-fav-toggle');
+            if (showFavoritesOnly) {
+                btn.classList.add('bg-amber-100', 'text-amber-900', 'border-amber-300');
+            } else {
+                btn.classList.remove('bg-amber-100', 'text-amber-900', 'border-amber-300');
+            }
+            updateResetWrap();
+            renderApp();
+        }
+
+        function resetAllFilters() {
+            searchQuery = '';
+            selectedNeighborhoodFilter = 'ALL';
+            activeFilterChip = null;
+            showFavoritesOnly = false;
+
+            document.getElementById('search-input').value = '';
+            document.getElementById('jump-neighborhood-select').value = 'ALL';
+            document.getElementById('clear-search-btn').classList.add('hidden');
+
+            document.querySelectorAll('.chip-btn').forEach(btn => {
+                btn.classList.remove('bg-stone-900', 'text-white', 'border-stone-900');
+                btn.classList.add('bg-stone-50', 'text-stone-700', 'border-stone-200');
+            });
+
+            const favBtn = document.getElementById('btn-fav-toggle');
+            favBtn.classList.remove('bg-amber-100', 'text-amber-900', 'border-amber-300');
+
+            updateResetWrap();
+            renderApp();
+        }
+
+        function updateResetWrap() {
+            const isModified = searchQuery !== '' || selectedNeighborhoodFilter !== 'ALL' || activeFilterChip !== null || showFavoritesOnly;
+            document.getElementById('reset-filter-wrap').classList.toggle('hidden', !isModified);
+        }
+
+        // --- FAVORITES & CRAWL APP LOGIC ---
+        function toggleFavorite(id) {
+            if (favorites.includes(id)) {
+                favorites = favorites.filter(fId => fId !== id);
+            } else {
+                favorites.push(id);
+            }
+            localStorage.setItem('hhh_favs_v2', JSON.stringify(favorites));
+            updateBadges();
+            renderApp();
+        }
+
+        function toggleCrawl(id) {
+            if (crawlStops.includes(id)) {
+                crawlStops = crawlStops.filter(cId => cId !== id);
+            } else {
+                crawlStops.push(id);
+            }
+            localStorage.setItem('hhh_crawl_v2', JSON.stringify(crawlStops));
+            updateBadges();
+            renderCrawlDrawer();
+            renderApp();
+        }
+
+        function updateBadges() {
+            const favBadge = document.getElementById('fav-badge');
+            const crawlBadge = document.getElementById('crawl-badge');
+
+            if (favBadge) {
+                favBadge.innerText = favorites.length;
+                favBadge.classList.toggle('hidden', favorites.length === 0);
+            }
+
+            if (crawlBadge) {
+                crawlBadge.innerText = crawlStops.length;
+                crawlBadge.classList.toggle('hidden', crawlStops.length === 0);
+            }
+        }
+
+        function toggleCrawlDrawer() {
+            renderCrawlDrawer();
+            const drawer = document.getElementById('crawl-drawer');
+            drawer.classList.toggle('translate-x-full');
+        }
+
+        function renderCrawlDrawer() {
+            const container = document.getElementById('crawl-items-container');
+            const stopCountEl = document.getElementById('crawl-stop-count');
+            const savingsEl = document.getElementById('crawl-savings-est');
+
+            const stopsData = happyHourData.filter(s => crawlStops.includes(s.id));
+            stopCountEl.innerText = stopsData.length;
+
+            if (stopsData.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-stone-400">
+                        <i data-lucide="map" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                        <p class="text-xs">No stops added yet. Click the route icon on any card to add spots to your crawl itinerary!</p>
+                    </div>
+                `;
+                savingsEl.innerText = '$0.00';
+                lucide.createIcons();
+                return;
+            }
+
+            const totalSavings = stopsData.reduce((acc, curr) => acc + (curr.savingsEst * 2), 0);
+            savingsEl.innerText = `$${totalSavings.toFixed(2)}`;
+
+            container.innerHTML = stopsData.map((spot, idx) => `
+                <div class="bg-stone-50 p-3 rounded-lg border border-stone-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-6 h-6 rounded-full bg-stone-900 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
+                            ${idx + 1}
+                        </span>
+                        <div>
+                            <h5 class="font-bold text-xs text-stone-900">${spot.name}</h5>
+                            <p class="text-[11px] text-stone-500">${spot.city} • ${spot.timeText}</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleCrawl('${spot.id}')" class="text-stone-400 hover:text-red-600 p-1">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function clearCrawl() {
+            crawlStops = [];
+            localStorage.setItem('hhh_crawl_v2', JSON.stringify([]));
+            updateBadges();
+            renderCrawlDrawer();
+            renderApp();
+        }
+
+        function copyCrawlItinerary() {
+            const stopsData = happyHourData.filter(s => crawlStops.includes(s.id));
+            if (stopsData.length === 0) return;
+
+            let text = "🍻 Happy Hour Hunter Itinerary:\n";
+            stopsData.forEach((s, idx) => {
+                text += `${idx + 1}. ${s.name} (${s.city}) - ${s.timeText}\n`;
+            });
+
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            alert("Itinerary copied to clipboard!");
+        }
+
+        // --- CLAIM MODAL ---
+        function openClaimModal() {
+            document.getElementById('claim-modal').classList.remove('hidden');
+        }
+
+        function closeClaimModal() {
+            document.getElementById('claim-modal').classList.add('hidden');
+        }
+
+        function handleClaimForm(e) {
+            e.preventDefault();
+            closeClaimModal();
+            alert("Thank you! Our partner management team will review your claim and get back to you shortly.");
+        }
+    </script>
+</body>
+</html>
